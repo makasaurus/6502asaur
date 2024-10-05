@@ -1,0 +1,68 @@
+	.ORG $C000
+
+lcd_clear	= $00	; clear lcd offset
+lcd_putchar	= $10	; putchar with lcd interperting
+lcd_putcharraw	= $20	; putchar raw
+lcd_puthex	= $40	; puthex
+lcd_setx	= $50	; set x cursor location
+lcd_sety	= $60	; sey y cursor location
+lcd_ignore	= $F0	; no lcd instruction
+
+exp0 = $9000				; expansion 0, VIA0
+exp0b_io 	= exp0 + 0		; expansion 0 reg A io
+exp0b_dd 	= exp0 + 2 + lcd_ignore	; expansion 0 reg A data direction
+
+exp0_lcd_clear 		= exp0b_io + lcd_clear
+exp0_lcd_putchar 	= exp0b_io + lcd_putchar
+exp0_lcd_putcharraw 	= exp0b_io + lcd_putcharraw
+exp0_lcd_puthex 	= exp0b_io + lcd_puthex
+exp0_lcd_setx 		= exp0b_io + lcd_setx
+exp0_lcd_sety		= exp0b_io + lcd_sety
+
+nmi
+irq
+restart
+	CLI
+	LDA #$FF
+	STA exp0b_dd		; set data direction on exp0 VIA to output
+	STA exp0_lcd_clear	; clear lcd
+	LDA #$00
+	STA $0400
+	LDA '~'
+	STA exp0_lcd_putchar
+
+loop1start
+	LDA #$FF
+	STA $0401
+loop1
+	LDA $0401
+	SEC
+	SBC #$01
+	STA $0401
+	BEQ nextchar
+
+loop2start
+	LDA #$FF
+	STA $0402
+loop2
+	LDA $0402
+	SEC
+	SBC #$01
+	STA $0402
+	BEQ loop1
+	JMP loop2
+
+nextchar
+	LDA #$01
+	CLC
+	ADC $0400
+	STA exp0_lcd_putchar
+	STA $0400
+	JMP loop1start
+
+table
+	; define interupt table
+	*= $fffa
+	.DW nmi
+	.DW restart
+	.DW irq
